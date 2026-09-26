@@ -3,6 +3,7 @@ import hmac
 import io
 import logging
 import os
+import secrets
 import uuid
 from collections import Counter, defaultdict
 from contextlib import asynccontextmanager
@@ -22,7 +23,7 @@ from pydantic import BaseModel  # noqa: E402
 from sqlalchemy import delete, func, select  # noqa: E402
 
 from . import ai, recommend  # noqa: E402
-from .db import Admin, Event, MenuItem, Order, SessionLocal, Visit, get_setting, init_db, set_setting, utcnow  # noqa: E402
+from .db import Admin, CafeTable, Event, MenuItem, Order, SessionLocal, Visit, get_setting, init_db, set_setting, utcnow  # noqa: E402
 from .seed import demo_items  # noqa: E402
 
 log = logging.getLogger("cafe")
@@ -74,6 +75,10 @@ async def lifespan(app):
     init_db()
     with SessionLocal() as db:
         try:
+            if not db.scalar(select(func.count(CafeTable.id))):
+                for n in range(1, 7):
+                    db.add(CafeTable(number=n, seats=2 if n <= 2 else 4, token=new_token()))
+                db.commit()
             if not db.scalar(select(func.count(MenuItem.id))):
                 add_items(db, demo_items())
             else:
@@ -165,15 +170,42 @@ def state(db, visit):
 
 # ---------- pages ----------
 
+def public_base(request: Request) -> str:
+    """Address used inside QR codes. PUBLIC_URL wins, because phones can't open localhost."""
+    return (os.getenv("PUBLIC_URL") or str(request.base_url)).rstrip("/")
+
+
+def table_link(request: Request, t: CafeTable) -> str:
+    return f"{public_base(request)}/t/{t.number}?k={t.token}"
+
+
+def new_token() -> str:
+    return secrets.token_urlsafe(6)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db=Depends(get_db)):
-    return templates.TemplateResponse(request, "home.html", {"cafe": cafe_name(db)})
+    demo = db.scalar(select(CafeTable).where(CafeTable.active.is_(True)).order_by(CafeTable.number))
+    return templates.TemplateResponse(request, "home.html", {
+        "cafe": cafe_name(db),
+        "demo_link": f"/t/{demo.number}?k={demo.token}" if demo else None,
+        "demo_label": demo.label if demo else None,
+    })
 
 
 @app.get("/t/{table_no}", response_class=HTMLResponse)
-def table_page(table_no: int, request: Request, db=Depends(get_db)):
-    if not 1 <= table_no <= 999:
-        raise HTTPException(404)
+def table_page(table_no: int, request: Request, k: str = "", db=Depends(get_db)):
+    table = db.scalar(select(CafeTable).where(CafeTable.number == table_no))
+    if not table or not hmac.compare_digest(k, table.token):
+        return templates.TemplateResponse(request, "table_closed.html", {
+            "cafe": cafe_name(db), "title": "Scan the QR on your table",
+            "message": "This link has expired or isn't complete. Scan the code on your table to order.",
+        }, status_code=404)
+    if not table.active:
+        return templates.TemplateResponse(request, "table_closed.html", {
+            "cafe": cafe_name(db), "title": f"{table.label} is resting",
+            "message": "This table isn't taking orders right now. Please order at the counter.",
+        })
     vid = request.cookies.get("visit")
     visit = db.get(Visit, vid) if vid else None
     fresh = not visit or visit.table_no != table_no or (utcnow() - visit.last_seen) > timedelta(hours=3)
@@ -181,7 +213,7 @@ def table_page(table_no: int, request: Request, db=Depends(get_db)):
         visit = Visit(id=str(uuid.uuid4()), table_no=table_no)
         db.add(visit)
         db.commit()
-    resp = templates.TemplateResponse(request, "table.html", {"cafe": cafe_name(db), "table": table_no})
+    resp = templates.TemplateResponse(request, "table.html", {"cafe": cafe_name(db), "table": table_no, "table_label": table.label})
     resp.set_cookie("visit", visit.id, max_age=6 * 3600, httponly=True, samesite="lax")
     return resp
 
@@ -189,17 +221,8 @@ def table_page(table_no: int, request: Request, db=Depends(get_db)):
 @app.get("/qr/site.svg")
 def qr_site(request: Request):
     """QR for the app's own home page (shown on the /admin page)."""
-    base = os.getenv("PUBLIC_URL") or str(request.base_url).rstrip("/")
     buf = io.BytesIO()
-    segno.make(base, error="h").save(buf, kind="svg", scale=8, border=2, dark="#2b1d14")
-    return Response(buf.getvalue(), media_type="image/svg+xml")
-
-
-@app.get("/qr/{table_no}.svg")
-def qr(table_no: int, request: Request):
-    base = os.getenv("PUBLIC_URL") or str(request.base_url).rstrip("/")
-    buf = io.BytesIO()
-    segno.make(f"{base}/t/{table_no}", error="m").save(buf, kind="svg", scale=8, border=2, dark="#2b1d14")
+    segno.make(public_base(request), error="h").save(buf, kind="svg", scale=8, border=2, dark="#2b1d14")
     return Response(buf.getvalue(), media_type="image/svg+xml")
 
 
@@ -343,6 +366,9 @@ def menu(request: Request, ranked: bool = False, db=Depends(get_db)):
 @app.post("/api/order")
 def place_order(body: OrderIn, request: Request, db=Depends(get_db)):
     visit = current_visit(request, db)
+    table = db.scalar(select(CafeTable).where(CafeTable.number == visit.table_no))
+    if not table or not table.active:
+        raise HTTPException(409, "This table isn't taking orders right now. Please order at the counter.")
     by_id = {i.id: i for i in all_items(db)}
     lines = [
         {"id": l.id, "name": by_id[l.id].name, "qty": max(1, min(l.qty, 20)), "price": by_id[l.id].price}
@@ -468,6 +494,106 @@ def admin_logout():
     return resp
 
 
+# ---------- tables (owner) ----------
+
+ZONES = ["Indoor", "Window", "Outdoor", "Counter", "Private"]
+
+
+def table_json(request, t: CafeTable, live: set[int], open_orders: Counter):
+    return {
+        "id": t.id, "number": t.number, "name": t.name, "label": t.label, "seats": t.seats, "zone": t.zone,
+        "active": t.active, "link": table_link(request, t), "live": t.number in live,
+        "open_orders": open_orders.get(t.number, 0),
+    }
+
+
+@app.get("/api/admin/tables", dependencies=[Depends(require_admin)])
+def list_tables(request: Request, db=Depends(get_db)):
+    tables = db.scalars(select(CafeTable).order_by(CafeTable.number)).all()
+    live = set(db.scalars(select(Visit.table_no).where(Visit.last_seen >= utcnow() - timedelta(minutes=30))).all())
+    open_orders = Counter(db.scalars(select(Order.table_no).where(Order.status != "served")).all())
+    return {"zones": ZONES, "tables": [table_json(request, t, live, open_orders) for t in tables]}
+
+
+class TablesAddIn(BaseModel):
+    count: int = 1
+    seats: int = 2
+    zone: str = "Indoor"
+
+
+@app.post("/api/admin/tables", dependencies=[Depends(require_admin)])
+def add_tables(body: TablesAddIn, db=Depends(get_db)):
+    count = max(1, min(body.count, 50))
+    total = db.scalar(select(func.count(CafeTable.id))) or 0
+    if total + count > 200:
+        raise HTTPException(400, "That would be more than 200 tables.")
+    start = (db.scalar(select(func.max(CafeTable.number))) or 0) + 1
+    for n in range(start, start + count):
+        db.add(CafeTable(number=n, seats=max(1, min(body.seats, 30)), zone=body.zone[:40] or "Indoor", token=new_token()))
+    db.commit()
+    return {"ok": True, "added": list(range(start, start + count))}
+
+
+class TablePatch(BaseModel):
+    name: str | None = None
+    seats: int | None = None
+    zone: str | None = None
+    active: bool | None = None
+
+
+@app.patch("/api/admin/tables/{table_id}", dependencies=[Depends(require_admin)])
+def edit_table(table_id: int, body: TablePatch, db=Depends(get_db)):
+    t = db.get(CafeTable, table_id)
+    if not t:
+        raise HTTPException(404)
+    if body.name is not None:
+        t.name = body.name.strip()[:60]
+    if body.seats is not None:
+        t.seats = max(1, min(body.seats, 30))
+    if body.zone is not None:
+        t.zone = body.zone.strip()[:40] or "Indoor"
+    if body.active is not None:
+        t.active = body.active
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/admin/tables/{table_id}/new-qr", dependencies=[Depends(require_admin)])
+def regenerate_qr(table_id: int, db=Depends(get_db)):
+    t = db.get(CafeTable, table_id)
+    if not t:
+        raise HTTPException(404)
+    t.token = new_token()
+    db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/tables/{table_id}", dependencies=[Depends(require_admin)])
+def delete_table(table_id: int, db=Depends(get_db)):
+    t = db.get(CafeTable, table_id)
+    if t:
+        db.delete(t)
+        db.commit()
+    return {"ok": True}
+
+
+# Table QRs contain the table's secret code, so only logged-in owners can fetch them.
+@app.get("/qr/table/{number}.{fmt}", dependencies=[Depends(require_admin)])
+def table_qr(number: int, fmt: str, request: Request, db=Depends(get_db)):
+    t = db.scalar(select(CafeTable).where(CafeTable.number == number))
+    if not t or fmt not in ("svg", "png"):
+        raise HTTPException(404)
+    qr = segno.make(table_link(request, t), error="m")
+    buf = io.BytesIO()
+    if fmt == "svg":
+        qr.save(buf, kind="svg", scale=8, border=2, dark="#2b1d14")
+        return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
+    qr.save(buf, kind="png", scale=16, border=3, dark="#2b1d14")
+    filename = f"{t.label.replace(' ', '-').lower()}-qr.png"
+    return Response(buf.getvalue(), media_type="image/png",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
+
+
 def collect_stats(db, hours=24):
     since = utcnow() - timedelta(hours=hours)
     items = all_items(db)
@@ -514,8 +640,9 @@ def collect_stats(db, hours=24):
 def admin_stats(db=Depends(get_db)):
     stats = collect_stats(db)
     orders = db.scalars(select(Order).where(Order.status != "served").order_by(Order.id)).all()
+    labels = {t.number: t.label for t in db.scalars(select(CafeTable)).all()}
     stats["orders"] = [
-        {"id": o.id, "table": o.table_no, "items": o.items, "note": o.note, "status": o.status,
+        {"id": o.id, "table": o.table_no, "table_label": labels.get(o.table_no, f"Table {o.table_no}"), "items": o.items, "note": o.note, "status": o.status,
          "age_min": int((utcnow() - o.created_at).total_seconds() // 60)}
         for o in orders
     ]

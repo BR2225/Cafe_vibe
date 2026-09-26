@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · {{ cafe }}{% endblock %}
+{% block bodyclass %}home{% endblock %}
+{% block body %}
+<div class="bg" aria-hidden="true"></div>
+<main class="hero">
+  <p class="eyebrow">{{ cafe }}</p>
+  <h1>{{ title }}</h1>
+  <p class="lede">{{ message }}</p>
+</main>
+{% endblock %}

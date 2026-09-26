@@ -31,7 +31,7 @@ $$(".tabs button").forEach((b) =>
     $$(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
     $$("main > section").forEach((s) => (s.hidden = s.id !== `tab-${b.dataset.tab}`));
     if (b.dataset.tab === "menu") loadMenu();
-    if (b.dataset.tab === "tables") renderQRs();
+    if (b.dataset.tab === "tables") loadTables();
   })
 );
 
@@ -57,13 +57,13 @@ async function refresh() {
         <td>${r.shown}</td><td>${r.like}</td><td>${r.meh}</td><td>${r.nope}</td><td>${r.ordered}</td>
         <td>${r.love_rate == null ? "–" : `${Math.round(r.love_rate * 100)}%<span class="bar"><i style="width:${r.love_rate * 100}%"></i></span>`}</td>
       </tr>`).join("")
-    : `<tr><td colspan="7" class="muted">No taps yet. Open a table page (Table QRs tab) and start tapping.</td></tr>`;
+    : `<tr><td colspan="7" class="muted">No taps yet. Open a table page (Tables tab) and start tapping.</td></tr>`;
 
   const open = s.orders;
   $("#orderCount").textContent = open.length ? `${open.length} open` : "";
   $("#orders").innerHTML = open.length
     ? open.map((o) => `<div class="order ${o.status}">
-        <div class="order-head"><span>Table ${o.table}</span><span class="muted">#${o.id} · ${o.age_min}m</span></div>
+        <div class="order-head"><span>${esc(o.table_label || "Table " + o.table)}</span><span class="muted">#${o.id} · ${o.age_min}m</span></div>
         <div>${o.items.map((l) => `${l.qty}× ${esc(l.name)}`).join(", ")}</div>
         ${o.note ? `<div class="muted">“${esc(o.note)}”</div>` : ""}
         <div class="row-actions">
@@ -213,13 +213,93 @@ $("#publishReplace").addEventListener("click", () => confirm("Replace the entire
 $("#publishAdd").addEventListener("click", () => publish(false));
 $("#discardDraft").addEventListener("click", () => { $("#draftWrap").hidden = true; draft = []; });
 
-// ---------- table QRs ----------
-function renderQRs() {
-  const n = Math.max(1, Math.min(60, Number($("#tableCount").value) || 1));
+// ---------- tables ----------
+let tableZones = [];
+async function loadTables() {
+  let r;
+  try { r = await api("/api/admin/tables"); } catch (err) { return toast(err.message); }
+  tableZones = r.zones;
+  if (!$("#addZone").options.length) $("#addZone").innerHTML = r.zones.map((z) => `<option>${esc(z)}</option>`).join("");
+  const live = r.tables.filter((t) => t.live).length;
+  const paused = r.tables.filter((t) => !t.active).length;
+  $("#tableSummary").textContent = `${r.tables.length} tables · ${live} live now${paused ? ` · ${paused} paused` : ""}`;
   const cafe = esc($("#cafeName").textContent);
-  $("#qrGrid").innerHTML = Array.from({ length: n }, (_, i) => i + 1).map((t) => `
-    <div class="qr-card"><img src="/qr/${t}.svg" alt="QR code for table ${t}" loading="lazy">
-      <b>Table ${t}</b><small>${cafe} · Scan to order</small><br><a href="/t/${t}" target="_blank" rel="noopener">Open</a></div>`).join("");
+  const zoneOpts = (cur) => [...new Set([...tableZones, cur])].map((z) => `<option ${z === cur ? "selected" : ""}>${esc(z)}</option>`).join("");
+  $("#tableGrid").innerHTML = r.tables.map((t) => {
+    const status = !t.active ? '<span class="chip paused">Paused</span>'
+      : t.live ? '<span class="chip live">Live now</span>' : '<span class="chip">Idle</span>';
+    return `
+    <article class="tcard ${t.active ? "" : "paused"}" data-id="${t.id}" data-number="${t.number}">
+      <div class="tcard-qr">
+        <img src="/qr/table/${t.number}.svg?v=${encodeURIComponent(t.link)}" alt="QR code for ${esc(t.label)}">
+        <b>${esc(t.label)}</b>
+        <small class="print-only">${cafe} · Scan to order</small>
+      </div>
+      <div class="tcard-body noprint">
+        <div class="tcard-status">${status}${t.open_orders ? `<span class="chip orders">${t.open_orders} open order${t.open_orders > 1 ? "s" : ""}</span>` : ""}<span class="muted">#${t.number}</span></div>
+        <label>Name <input data-f="name" value="${esc(t.name)}" placeholder="Table ${t.number}" maxlength="60"></label>
+        <div class="two">
+          <label>Seats <input data-f="seats" type="number" min="1" max="30" value="${t.seats}"></label>
+          <label>Zone <select data-f="zone">${zoneOpts(t.zone)}</select></label>
+        </div>
+        <div class="tcard-actions">
+          <a href="${esc(t.link)}" target="_blank" rel="noopener">Open</a>
+          <a href="/qr/table/${t.number}.png" download>Download QR</a>
+          <button class="link" data-act="toggle">${t.active ? "Pause" : "Resume"}</button>
+          <button class="link" data-act="newqr">New QR</button>
+          <button class="link danger" data-act="delete">Delete</button>
+        </div>
+      </div>
+    </article>`;
+  }).join("") || '<p class="muted">No tables yet. Add some above.</p>';
 }
-$("#tableCount").addEventListener("change", renderQRs);
+
+$("#addTables").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = { count: Number($("#addCount").value), seats: Number($("#addSeats").value), zone: $("#addZone").value };
+  try {
+    const r = await api("/api/admin/tables", { method: "POST", body });
+    toast(`Added table${r.added.length > 1 ? "s" : ""} ${r.added[0]}${r.added.length > 1 ? "–" + r.added.at(-1) : ""}`);
+    loadTables();
+  } catch (err) { toast(err.message); }
+});
+
+// Edits save as soon as a field changes.
+$("#tableGrid").addEventListener("change", async (e) => {
+  const f = e.target.closest("[data-f]");
+  if (!f) return;
+  const id = f.closest(".tcard").dataset.id;
+  const value = f.dataset.f === "seats" ? Number(f.value) : f.value;
+  try {
+    await api(`/api/admin/tables/${id}`, { method: "PATCH", body: { [f.dataset.f]: value } });
+    toast("Saved");
+    loadTables();
+  } catch (err) { toast(err.message); }
+});
+
+$("#tableGrid").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const card = b.closest(".tcard");
+  const id = card.dataset.id;
+  const label = card.querySelector(".tcard-qr b").textContent;
+  try {
+    if (b.dataset.act === "toggle") {
+      await api(`/api/admin/tables/${id}`, { method: "PATCH", body: { active: card.classList.contains("paused") } });
+    } else if (b.dataset.act === "newqr") {
+      if (!confirm(`Make a new QR for ${label}? The old printed QR will stop working.`)) return;
+      await api(`/api/admin/tables/${id}/new-qr`, { method: "POST" });
+      toast("New QR ready. Print it and replace the old one.");
+    } else if (b.dataset.act === "delete") {
+      if (!confirm(`Delete ${label}? Its QR will stop working.`)) return;
+      await api(`/api/admin/tables/${id}`, { method: "DELETE" });
+    }
+    loadTables();
+  } catch (err) { toast(err.message); }
+});
+
 $("#printQr").addEventListener("click", () => window.print());
+setInterval(() => {
+  const editing = document.activeElement?.closest?.("#tableGrid");
+  if (!$("#tab-tables").hidden && !document.hidden && !editing) loadTables();
+}, 10000);

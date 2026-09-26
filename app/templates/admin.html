@@ -11,7 +11,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="live" aria-selected="true">Live</button>
     <button role="tab" data-tab="menu">Menu</button>
-    <button role="tab" data-tab="tables">Table QRs</button>
+    <button role="tab" data-tab="tables">Tables</button>
   </nav>
 </header>
 
@@ -83,16 +83,20 @@
 
   <section id="tab-tables" hidden>
     <div class="panel noprint">
-      <div class="panel-head"><h2>Table QR codes</h2>
-        <div class="row-actions">
-          <label class="muted" for="tableCount">Tables</label>
-          <input id="tableCount" type="number" min="1" max="60" value="6" class="narrow">
-          <button class="btn primary" id="printQr">Print</button>
-        </div>
+      <div class="panel-head"><h2>Tables</h2>
+        <div class="row-actions"><span class="muted" id="tableSummary"></span>
+          <button class="btn ghost" id="printQr">Print QR cards</button></div>
       </div>
-      <p class="muted">Each code opens that table's page. Put one on every table.</p>
+      <form class="add-tables" id="addTables">
+        <label>Add <input id="addCount" type="number" min="1" max="50" value="4" class="narrow" aria-label="Number of tables"> tables</label>
+        <label>with <input id="addSeats" type="number" min="1" max="30" value="2" class="narrow" aria-label="Seats per table"> seats</label>
+        <label>in <select id="addZone" aria-label="Zone"></select></label>
+        <button class="btn primary" type="submit">Add tables</button>
+      </form>
+      <p class="muted">Every table has its own QR with a secret code. Rename or pause a table any time.
+        <b>New QR</b> retires the old printed code, so a photo of it stops working.</p>
     </div>
-    <div id="qrGrid" class="qr-grid"></div>
+    <div id="tableGrid" class="table-grid"></div>
   </section>
 </main>
 {% endblock %}

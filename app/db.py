@@ -84,6 +84,23 @@ class Admin(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class CafeTable(Base):
+    """A physical table. Its QR opens /t/<number>?k=<token>; a new token retires old printed codes."""
+    __tablename__ = "cafe_tables"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    number: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(60), default="")
+    seats: Mapped[int] = mapped_column(Integer, default=2)
+    zone: Mapped[str] = mapped_column(String(40), default="Indoor")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    token: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    @property
+    def label(self):
+        return self.name or f"Table {self.number}"
+
+
 class MenuItem(Base):
     __tablename__ = "menu_items"
     __table_args__ = {"sqlite_autoincrement": True}  # never reuse ids, so old taps can't attach to new items

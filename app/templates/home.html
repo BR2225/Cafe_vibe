@@ -8,7 +8,7 @@
   <h1>{{ cafe }}</h1>
   <p class="lede">Scan the QR code on your table. Tell us your mood, tap what you like, and we'll pick the rest. No app, no sign-up.</p>
   <div class="hero-actions">
-    <a class="btn primary" href="/t/1">Try it as Table 1</a>
+    {% if demo_link %}<a class="btn primary" href="{{ demo_link }}">Try it as {{ demo_label }}</a>{% endif %}
     <a class="btn ghost" href="/admin">Owner dashboard</a>
   </div>
   <ul class="hero-steps plain">

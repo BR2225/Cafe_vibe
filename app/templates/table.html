@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Table {{ table }} · {{ cafe }}{% endblock %}
+{% block title %}{{ table_label }} · {{ cafe }}{% endblock %}
 {% block bodyclass %}customer{% endblock %}
 {% block body %}
 <div class="bg" aria-hidden="true"></div>
 <header class="topbar">
   <div>
     <div class="brand">{{ cafe }}</div>
-    <div class="sub">Table {{ table }}</div>
+    <div class="sub">{{ table_label }}</div>
   </div>
   <div class="topbar-actions">
     <button class="link" id="menuLink" data-go="menu" hidden>Full menu</button>
