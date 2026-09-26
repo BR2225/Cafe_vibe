@@ -22,6 +22,18 @@ def _database_url():
             database=os.getenv("DB_NAME", "cafe"),
             query={"host": f"/cloudsql/{conn}"},
         )
+    # Local dev against Cloud SQL's public IP (your IP must be in Authorized networks).
+    host = os.getenv("DB_HOST")
+    if host:
+        return URL.create(
+            "postgresql+psycopg",
+            username=os.environ["DB_USER"],
+            password=os.environ["DB_PASS"],
+            host=host,
+            port=int(os.getenv("DB_PORT", "5432")),
+            database=os.getenv("DB_NAME", "cafe"),
+            query={"sslmode": "require"},
+        )
     return make_url(os.getenv("DATABASE_URL", "sqlite:///./cafe.db"))
 
 
