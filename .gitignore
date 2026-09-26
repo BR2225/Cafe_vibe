@@ -7,3 +7,4 @@ __pycache__/
 node_modules/
 sa-key.json
 *-key.json
+graphite-earth-*.json
