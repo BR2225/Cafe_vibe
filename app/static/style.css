@@ -470,3 +470,75 @@ small.custom { color: var(--accent); font-weight: 600; }
 .order-lines small.custom { display: block; margin-left: 1.4rem; font-size: .8rem; }
 .custom-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .custom-chips .chip b { margin-left: 4px; }
+
+/* ---------- photography (CC0 photos in /static/img, see CREDITS.txt) ---------- */
+body.customer, body.home { --photo: url("/static/img/cafe.jpg"); }
+body[data-mood=work]   { --photo: url("/static/img/work.jpg"); }
+body[data-mood=meet]   { --photo: url("/static/img/meet.jpg"); }
+body[data-mood=unwind] { --photo: url("/static/img/unwind.jpg"); }
+.bg { background: var(--bg-base); }
+.bg::before {
+  content: ""; position: absolute; inset: 0; opacity: 1;
+  background: var(--photo) center / cover no-repeat;
+}
+/* Photo shows clearly at the top, then fades into the page colour so text stays readable. */
+.bg::after {
+  content: ""; position: absolute; inset: 0; opacity: 1; background-size: auto;
+  background-image: linear-gradient(180deg,
+    color-mix(in srgb, var(--bg-base) 50%, transparent) 0%,
+    color-mix(in srgb, var(--bg-base) 82%, transparent) 24%,
+    color-mix(in srgb, var(--bg-base) 90%, transparent) 50%,
+    color-mix(in srgb, var(--bg-base) 96%, transparent) 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .bg::after {
+    background-image: linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-base) 40%, transparent) 0%,
+      color-mix(in srgb, var(--bg-base) 78%, transparent) 26%,
+      color-mix(in srgb, var(--bg-base) 92%, transparent) 50%,
+      color-mix(in srgb, var(--bg-base) 97%, transparent) 100%);
+  }
+}
+.customer .topbar { background: color-mix(in srgb, var(--bg-base) 55%, transparent); }
+
+/* Mood choices become photo tiles. */
+.customer .mood {
+  position: relative; overflow: hidden; min-height: 116px; border: 0; color: #fff;
+  background: #2b1d14 var(--tile) center / cover no-repeat;
+  box-shadow: 0 10px 28px rgba(20, 12, 6, .22); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.customer .mood[data-mood=work]   { --tile: url("/static/img/work.jpg"); }
+.customer .mood[data-mood=meet]   { --tile: url("/static/img/meet.jpg"); }
+.customer .mood[data-mood=unwind] { --tile: url("/static/img/unwind.jpg"); }
+.customer .mood::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(20, 12, 6, .86) 0%, rgba(20, 12, 6, .6) 50%, rgba(20, 12, 6, .12) 100%);
+}
+.customer .mood > * { position: relative; }
+.customer .mood b { font-family: "Fraunces", Georgia, serif; font-size: 1.35rem; font-weight: 600; color: #fff; }
+.customer .mood small { color: rgba(255, 255, 255, .85); }
+.customer .mood .mood-icon, .customer .mood span { color: #f3c79b; }
+.customer .mood:hover, .customer .mood:focus-visible { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(20, 12, 6, .3); }
+
+/* Order status gets a latte-art banner. */
+.customer .status-card { overflow: hidden; }
+.customer .status-card::before {
+  content: ""; display: block; height: 150px; margin: -28px -18px 18px;
+  background: url("/static/img/latte.jpg") center / cover no-repeat;
+}
+
+/* Home: one full-screen photo, text on a dark fade. */
+body.landing { --photo: url("/static/img/hero.jpg"); color: #fff; background: #140c07; }
+body.landing .bg::after {
+  background-image: linear-gradient(180deg, rgba(20, 12, 7, .25) 0%, rgba(20, 12, 7, .45) 40%, rgba(20, 12, 7, .92) 100%);
+}
+body.landing .hero {
+  min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end;
+  padding-top: 12vh; padding-bottom: 7vh;
+}
+body.landing .hero h1 { color: #fff; font-size: clamp(2.6rem, 11vw, 4rem); line-height: 1.02; }
+body.landing .eyebrow { color: #f3c79b; }
+body.landing .lede, body.landing .hero-steps, body.landing .hero-steps li { color: rgba(255, 255, 255, .86); }
+body.landing .mark { color: #f3c79b; }
+body.landing .btn.ghost { color: #fff; border-color: rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .08); }
+body.landing .rule { background: #f3c79b; }
