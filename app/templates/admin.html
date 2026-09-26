@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ cafe }}{% endblock %}
+{% block bodyclass %}admin{% endblock %}
+{% block body %}
+<header class="topbar">
+  <div>
+    <div class="brand" id="cafeName">{{ cafe }}</div>
+    <div class="sub">Owner dashboard <span class="live-dot" title="Updating live"></span></div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="live" aria-selected="true">Live</button>
+    <button role="tab" data-tab="menu">Menu</button>
+    <button role="tab" data-tab="tables">Table QRs</button>
+  </nav>
+</header>
+
+<main class="wide">
+  <section id="tab-live">
+    <div class="kpis">
+      <div class="kpi"><small>Active tables</small><b id="kTables">0</b></div>
+      <div class="kpi"><small>Taps (24h)</small><b id="kTaps">0</b></div>
+      <div class="kpi"><small>Moods chosen</small><b id="kMoods" class="small">–</b></div>
+      <div class="kpi"><small>Set buttons</small><b id="kSets" class="small">–</b></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-head"><h2>✨ What should I change?</h2>
+          <button class="btn primary" id="askGemini">Ask Gemini</button></div>
+        <p class="muted" id="insightHint">Gemini reads today's anonymous taps and suggests menu changes.</p>
+        <div id="insights"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Orders</h2><span class="muted" id="orderCount"></span></div>
+        <div id="orders" class="orders"></div>
+      </div>
+    </div>
+
+    <div class="highlights" id="highlights"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>How each item is landing (24h)</h2></div>
+      <div class="table-wrap">
+        <table class="stats">
+          <thead><tr><th>Item</th><th title="Times suggested">Shown</th><th>❤️</th><th>😐</th><th>✕</th><th>Ordered</th><th>Love rate</th></tr></thead>
+          <tbody id="statRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-menu" hidden>
+    <div class="panel onboarding">
+      <h2>📸 Photograph your menu</h2>
+      <p class="muted">Snap your paper menu. Gemini turns it into a live, personalised QR menu. You review it before anything goes live.</p>
+      <div class="upload-row">
+        <input id="newCafeName" type="text" placeholder="Café name (optional)">
+        <label class="btn ghost file"><input id="photo" type="file" accept="image/*" hidden><span id="photoLabel">Choose photo</span></label>
+        <button class="btn primary" id="extractBtn" disabled>Read menu with Gemini</button>
+      </div>
+      <div id="draftWrap" hidden>
+        <p class="warn">⚠️ Gemini guessed the allergens. Check each item before publishing.</p>
+        <div class="table-wrap">
+          <table class="draft">
+            <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Veg</th><th>Allergens</th><th>Blurb</th><th></th></tr></thead>
+            <tbody id="draftRows"></tbody>
+          </table>
+        </div>
+        <div class="row-actions">
+          <button class="btn primary" id="publishReplace">Replace menu with these</button>
+          <button class="btn ghost" id="publishAdd">Add to current menu</button>
+          <button class="link" id="discardDraft">Discard</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Current menu</h2><button class="link" id="resetDemo">Reset to demo menu</button></div>
+      <div id="menuRows" class="menu-rows"></div>
+    </div>
+  </section>
+
+  <section id="tab-tables" hidden>
+    <div class="panel noprint">
+      <div class="panel-head"><h2>Table QR codes</h2>
+        <div class="row-actions">
+          <label class="muted" for="tableCount">Tables</label>
+          <input id="tableCount" type="number" min="1" max="60" value="6" class="narrow">
+          <button class="btn primary" id="printQr">Print</button>
+        </div>
+      </div>
+      <p class="muted">Each code opens that table's page. Put one on every table.</p>
+    </div>
+    <div id="qrGrid" class="qr-grid"></div>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/admin.js" defer></script>{% endblock %}

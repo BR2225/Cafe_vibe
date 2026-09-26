@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Owner login · {{ cafe }}{% endblock %}
+{% block bodyclass %}home{% endblock %}
+{% block body %}
+<main class="hero">
+  <p class="eyebrow">{{ cafe }}</p>
+  <h1>Owner dashboard</h1>
+  <form method="post" action="/admin/login" class="login">
+    <label for="pin">Staff PIN</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required autofocus>
+    {% if error %}<p class="error">That PIN didn't match.</p>{% endif %}
+    <button class="btn primary" type="submit">Open dashboard</button>
+  </form>
+</main>
+{% endblock %}

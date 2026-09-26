@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Table {{ table }} · {{ cafe }}{% endblock %}
+{% block bodyclass %}customer{% endblock %}
+{% block body %}
+<header class="topbar">
+  <div>
+    <div class="brand">{{ cafe }}</div>
+    <div class="sub">Table {{ table }}</div>
+  </div>
+  <button class="link" id="menuLink" data-go="menu" hidden>Full menu</button>
+</header>
+
+<main>
+  <section id="view-mood">
+    <h1>What brings you in?</h1>
+    <p class="muted">We'll suggest a few things to start. Tap to tell us what you think.</p>
+    <div class="moods">
+      <button class="mood" data-mood="work"><span>💻</span><b>Working</b><small>Focus fuel, easy snacks</small></button>
+      <button class="mood" data-mood="meet"><span>🗣️</span><b>Meeting</b><small>Something to share</small></button>
+      <button class="mood" data-mood="unwind"><span>🛋️</span><b>Unwinding</b><small>Cosy and indulgent</small></button>
+    </div>
+    <button class="link center" data-go="menu">Just show me the menu</button>
+    <p class="privacy">No sign-up. Your taps are anonymous and help the café improve its menu.</p>
+  </section>
+
+  <section id="view-picks" hidden>
+    <div class="section-head">
+      <h1>Picked for you</h1>
+      <button class="chip" id="changeMood" title="Change mood"></button>
+    </div>
+    <p class="muted hint">Tap ❤️ 😐 ✕ on any item, or judge the whole set below.</p>
+    <div id="picks" class="cards"></div>
+    <div class="set-buttons">
+      <button class="set love" data-set="love"><span>😍</span><div><b>I like this menu</b><small>Show everything, ranked for me</small></div></button>
+      <button class="set mixed" data-set="mixed"><span>🤔</span><div><b>I sort of like it</b><small>Keep the good ones, swap the rest</small></div></button>
+      <button class="set nope" data-set="nope"><span>🙅</span><div><b>Not for me</b><small>Show me something different</small></div></button>
+    </div>
+    <button class="link center" data-go="menu">See the full menu</button>
+  </section>
+
+  <section id="view-menu" hidden>
+    <div class="section-head">
+      <h1>Menu</h1>
+      <button class="link" id="backToPicks">← My picks</button>
+    </div>
+    <div class="seg" role="tablist">
+      <button role="tab" data-mode="ranked">For you</button>
+      <button role="tab" data-mode="full">By category</button>
+    </div>
+    <div id="menuList"></div>
+  </section>
+
+  <section id="view-status" hidden>
+    <div class="status-card">
+      <div class="status-icon" id="statusIcon">🧾</div>
+      <h1 id="statusTitle">Sent to the counter</h1>
+      <p class="muted" id="statusSub"></p>
+      <ul id="statusItems" class="plain"></ul>
+      <button class="btn ghost" id="orderMore">Order something else</button>
+    </div>
+  </section>
+</main>
+
+<div class="cartbar" id="cartbar" hidden>
+  <button class="btn primary wide" id="openCart"><span id="cartCount"></span><span id="cartTotal"></span></button>
+</div>
+
+<dialog id="cartSheet" class="sheet">
+  <div class="sheet-inner">
+    <div class="section-head"><h2>Your order</h2><button class="link" id="closeCart">Close</button></div>
+    <ul id="cartLines" class="plain lines"></ul>
+    <label class="muted" for="note">Anything we should know?</label>
+    <textarea id="note" rows="2" placeholder="Less sugar, extra hot, allergy notes…"></textarea>
+    <div class="total-row"><span>Total</span><b id="sheetTotal"></b></div>
+    <button class="btn primary wide" id="sendOrder">Send to counter</button>
+    <p class="privacy">Pay at the counter as usual.</p>
+  </div>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="/static/table.js" defer></script>{% endblock %}
