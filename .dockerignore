@@ -4,3 +4,6 @@
 __pycache__/
 .git/
 .venv/
+sa-key.json
+*-key.json
+check_db.py

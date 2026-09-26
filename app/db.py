@@ -32,16 +32,34 @@ def _database_url():
             host=host,
             port=int(os.getenv("DB_PORT", "5432")),
             database=os.getenv("DB_NAME", "cafe"),
-            query={"sslmode": "require"},
+            query={"sslmode": "require", "connect_timeout": "10"},
         )
     return make_url(os.getenv("DATABASE_URL", "sqlite:///./cafe.db"))
 
 
-_url = _database_url()
-if _url.get_backend_name() == "sqlite":
-    engine = create_engine(_url, connect_args={"check_same_thread": False})
+def _connector_engine():
+    """Local dev via the Cloud SQL Python Connector (port 3307, Google credentials, no IP allow-list)."""
+    from google.cloud.sql.connector import Connector, IPTypes
+
+    connector = Connector(ip_type=IPTypes.PUBLIC)
+
+    def getconn():
+        return connector.connect(
+            os.environ["INSTANCE_CONNECTION_NAME"], "pg8000",
+            user=os.environ["DB_USER"], password=os.environ["DB_PASS"], db=os.getenv("DB_NAME", "cafe"),
+        )
+
+    return create_engine("postgresql+pg8000://", creator=getconn, pool_pre_ping=True, pool_size=5, max_overflow=2)
+
+
+if os.getenv("USE_SQL_CONNECTOR") == "1":
+    engine = _connector_engine()
 else:
-    engine = create_engine(_url, pool_pre_ping=True, pool_size=5, max_overflow=2)
+    _url = _database_url()
+    if _url.get_backend_name() == "sqlite":
+        engine = create_engine(_url, connect_args={"check_same_thread": False})
+    else:
+        engine = create_engine(_url, pool_pre_ping=True, pool_size=5, max_overflow=2)
 
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
