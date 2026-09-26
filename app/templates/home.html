@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block bodyclass %}home{% endblock %}
 {% block body %}
-<div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
-<main class="hero">
+<div class="bg" aria-hidden="true"></div>
+<main class="hero splash">
+  <div class="mark" id="homeMark"></div>
   <p class="eyebrow">Café Companion</p>
   <h1>{{ cafe }}</h1>
   <p class="lede">Scan the QR code on your table. Tell us your mood, tap what you like, and we'll pick the rest. No app, no sign-up.</p>
@@ -10,5 +11,11 @@
     <a class="btn primary" href="/t/1">Try it as Table 1</a>
     <a class="btn ghost" href="/admin">Owner dashboard</a>
   </div>
+  <ul class="hero-steps plain">
+    <li><span class="step-no">1</span>Scan the code on your table</li>
+    <li><span class="step-no">2</span>Tell us if you're working, meeting or unwinding</li>
+    <li><span class="step-no">3</span>Tap what looks good — we refine the picks as you go</li>
+  </ul>
 </main>
 {% endblock %}
+{% block scripts %}<script>document.getElementById("homeMark").innerHTML = Icon.unwind();</script>{% endblock %}

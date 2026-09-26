@@ -1,16 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Owner login · {{ cafe }}{% endblock %}
+{% block title %}{{ "Register" if mode == "register" else "Log in" }} · {{ cafe }}{% endblock %}
 {% block bodyclass %}home{% endblock %}
 {% block body %}
-<div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
-<main class="hero">
+<div class="bg" aria-hidden="true"></div>
+<main class="hero auth">
   <p class="eyebrow">{{ cafe }}</p>
   <h1>Owner dashboard</h1>
-  <form method="post" action="/admin/login" class="login">
-    <label for="pin">Staff PIN</label>
-    <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required autofocus>
-    {% if error %}<p class="error">That PIN didn't match.</p>{% endif %}
-    <button class="btn primary" type="submit">Open dashboard</button>
+
+  <nav class="seg auth-tabs" aria-label="Account">
+    <a href="/admin" {% if mode != "register" %}aria-current="page"{% endif %}>Log in</a>
+    <a href="/admin?mode=register" {% if mode == "register" %}aria-current="page"{% endif %}>Register</a>
+  </nav>
+
+  {% if mode == "register" %}
+  <form method="post" action="/admin/register" class="login">
+    <label for="name">Your name</label>
+    <input id="name" name="name" type="text" autocomplete="name" value="{{ name }}" required autofocus>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" value="{{ email }}" required>
+    <label for="password">Password <small class="muted">(8+ characters)</small></label>
+    <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+    <label for="invite">Staff invite code</label>
+    <input id="invite" name="invite" type="password" autocomplete="off" required>
+    <small class="muted">Ask the café owner. It keeps strangers out of your dashboard.</small>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <button class="btn primary" type="submit">Create account</button>
   </form>
+  {% else %}
+  <form method="post" action="/admin/login" class="login">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" value="{{ email }}" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <button class="btn primary" type="submit">Log in</button>
+    <small class="muted">New here? <a href="/admin?mode=register">Create an account</a></small>
+  </form>
+  {% endif %}
+
+  <section class="site-qr" aria-label="Scan to open the café app">
+    <img src="/qr/site.svg" alt="QR code that opens the café app" width="168" height="168">
+    <div>
+      <b>Scan to open the app</b>
+      <p class="muted">Point a phone camera here to try the customer experience.</p>
+      <a href="/" class="site-url">{{ request.base_url }}</a>
+    </div>
+  </section>
 </main>
 {% endblock %}

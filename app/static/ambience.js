@@ -138,7 +138,8 @@
   function render() {
     const b = document.getElementById("soundBtn");
     if (!b) return;
-    b.textContent = playing ? "🔊" : "🔇";
+    b.innerHTML = playing ? Icon.soundOn() : Icon.soundOff();
+    b.dataset.on = String(playing);
     b.setAttribute("aria-label", playing ? "Mute music" : "Play music");
     b.title = playing ? `Playing: ${MOODS[mood].name} (tap to mute)` : "Music off (tap to play)";
   }

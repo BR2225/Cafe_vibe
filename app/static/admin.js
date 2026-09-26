@@ -41,13 +41,13 @@ async function refresh() {
   try { s = await api("/api/admin/stats"); } catch { return; }
   $("#kTables").textContent = s.active_tables;
   $("#kTaps").textContent = s.taps;
-  $("#kMoods").textContent = `💻 ${s.moods.work} · 🗣️ ${s.moods.meet} · 🛋️ ${s.moods.unwind}`;
-  $("#kSets").textContent = `😍 ${s.set_buttons.love} · 🤔 ${s.set_buttons.mixed} · 🙅 ${s.set_buttons.nope}`;
+  $("#kMoods").innerHTML = `${Icon.work("icon-sm")} ${s.moods.work} · ${Icon.meet("icon-sm")} ${s.moods.meet} · ${Icon.unwind("icon-sm")} ${s.moods.unwind}`;
+  $("#kSets").innerHTML = `${Icon.heart("icon-sm")} ${s.set_buttons.love} · ${Icon.meh("icon-sm")} ${s.set_buttons.mixed} · ${Icon.nope("icon-sm")} ${s.set_buttons.nope}`;
 
   const h = s.highlights;
   $("#highlights").innerHTML = `
-    <div class="hl good"><small>Most loved</small><b>${h.top_loved ? `${esc(h.top_loved.name)} · ❤️ ${h.top_loved.like}` : "No likes yet"}</b></div>
-    <div class="hl bad"><small>Most rejected</small><b>${h.most_rejected ? `${esc(h.most_rejected.name)} · ✕ ${h.most_rejected.nope}` : "Nothing rejected yet"}</b></div>
+    <div class="hl good"><small>Most loved</small><b>${h.top_loved ? `${esc(h.top_loved.name)} · ${Icon.heart("icon-sm")} ${h.top_loved.like}` : "No likes yet"}</b></div>
+    <div class="hl bad"><small>Most rejected</small><b>${h.most_rejected ? `${esc(h.most_rejected.name)} · ${Icon.nope("icon-sm")} ${h.most_rejected.nope}` : "Nothing rejected yet"}</b></div>
     <div class="hl"><small>Loved but not ordered</small><b>${h.liked_not_ordered.length ? esc(h.liked_not_ordered.join(", ")) : "–"}</b></div>`;
 
   const active = s.items.filter((r) => r.shown || r.like || r.meh || r.nope || r.ordered);
@@ -91,11 +91,18 @@ $("#askGemini").addEventListener("click", async () => {
     const r = await api("/api/admin/insights", { method: "POST" });
     $("#insightHint").textContent = r.message || "Based on the last 24 hours of taps:";
     $("#insights").innerHTML = (r.insights || []).map((i) => `
-      <div class="insight"><b>${esc(i.headline)}</b><p>${esc(i.detail)}</p><div class="action">→ ${esc(i.action)}</div></div>`).join("");
+      <div class="insight"><b>${esc(i.headline)}</b><p>${esc(i.detail)}</p><div class="action">${Icon.arrowLeft("icon-sm rotate")} ${esc(i.action)}</div></div>`).join("");
   } catch (err) { toast(err.message); }
   b.disabled = false;
   b.textContent = "Ask again";
 });
+
+$("#insightHead").innerHTML = `${Icon.spark("icon-sm")} What should I change?`;
+$("#photoHead").innerHTML = `${Icon.camera()} Photograph your menu`;
+$("#draftWarn").innerHTML = `${Icon.warning("icon-sm")} Gemini guessed the allergens. Check each item before publishing.`;
+$("#thLove").innerHTML = Icon.heart("icon-sm");
+$("#thMeh").innerHTML = Icon.meh("icon-sm");
+$("#thNope").innerHTML = Icon.nope("icon-sm");
 
 refresh();
 setInterval(() => { if (!$("#tab-live").hidden && !document.hidden) refresh(); }, 4000);
@@ -164,7 +171,7 @@ function renderDraft(items) {
       <td><input data-f="veg" type="checkbox" ${i.veg ? "checked" : ""} style="width:auto"></td>
       <td><input data-f="allergens" value="${esc((i.allergens || []).join(", "))}"></td>
       <td><input data-f="blurb" value="${esc(i.blurb)}"></td>
-      <td><button class="link" data-drop="${n}" aria-label="Remove">✕</button></td>
+      <td><button class="link" data-drop="${n}" aria-label="Remove">${Icon.nope("icon-sm")}</button></td>
     </tr>`).join("");
 }
 

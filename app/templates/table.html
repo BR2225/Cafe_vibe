@@ -2,7 +2,7 @@
 {% block title %}Table {{ table }} · {{ cafe }}{% endblock %}
 {% block bodyclass %}customer{% endblock %}
 {% block body %}
-<div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="bg" aria-hidden="true"></div>
 <header class="topbar">
   <div>
     <div class="brand">{{ cafe }}</div>
@@ -10,7 +10,7 @@
   </div>
   <div class="topbar-actions">
     <button class="link" id="menuLink" data-go="menu" hidden>Full menu</button>
-    <button class="icon-btn" id="soundBtn" aria-label="Play music">🔇</button>
+    <button class="icon-btn" id="soundBtn" aria-label="Play music"></button>
   </div>
 </header>
 
@@ -19,9 +19,9 @@
     <h1>What brings you in?</h1>
     <p class="muted">We'll suggest a few things to start. Tap to tell us what you think.</p>
     <div class="moods">
-      <button class="mood" data-mood="work"><span>💻</span><b>Working</b><small>Focus fuel, easy snacks</small></button>
-      <button class="mood" data-mood="meet"><span>🗣️</span><b>Meeting</b><small>Something to share</small></button>
-      <button class="mood" data-mood="unwind"><span>🛋️</span><b>Unwinding</b><small>Cosy and indulgent</small></button>
+      <button class="mood" data-mood="work"><span class="mood-icon"></span><b>Working</b><small>Focus fuel, easy snacks</small></button>
+      <button class="mood" data-mood="meet"><span class="mood-icon"></span><b>Meeting</b><small>Something to share</small></button>
+      <button class="mood" data-mood="unwind"><span class="mood-icon"></span><b>Unwinding</b><small>Cosy and indulgent</small></button>
     </div>
     <button class="link center" data-go="menu">Just show me the menu</button>
     <p class="privacy">No sign-up. Your taps are anonymous and help the café improve its menu.</p>
@@ -32,12 +32,12 @@
       <h1>Picked for you</h1>
       <button class="chip" id="changeMood" title="Change mood"></button>
     </div>
-    <p class="muted hint">Tap ❤️ 😐 ✕ on any item, or judge the whole set below.</p>
+    <p class="muted hint">React to any item, or judge the whole set below.</p>
     <div id="picks" class="cards"></div>
     <div class="set-buttons">
-      <button class="set love" data-set="love"><span>😍</span><div><b>I like this menu</b><small>Show everything, ranked for me</small></div></button>
-      <button class="set mixed" data-set="mixed"><span>🤔</span><div><b>I sort of like it</b><small>Keep the good ones, swap the rest</small></div></button>
-      <button class="set nope" data-set="nope"><span>🙅</span><div><b>Not for me</b><small>Show me something different</small></div></button>
+      <button class="set love" data-set="love"><span class="set-icon"></span><div><b>I like this menu</b><small>Show everything, ranked for me</small></div></button>
+      <button class="set mixed" data-set="mixed"><span class="set-icon"></span><div><b>I sort of like it</b><small>Keep the good ones, swap the rest</small></div></button>
+      <button class="set nope" data-set="nope"><span class="set-icon"></span><div><b>Not for me</b><small>Show me something different</small></div></button>
     </div>
     <button class="link center" data-go="menu">See the full menu</button>
   </section>
@@ -45,7 +45,7 @@
   <section id="view-menu" hidden>
     <div class="section-head">
       <h1>Menu</h1>
-      <button class="link" id="backToPicks">← My picks</button>
+      <button class="link" id="backToPicks"></button>
     </div>
     <div class="seg" role="tablist">
       <button role="tab" data-mode="ranked">For you</button>
@@ -56,7 +56,7 @@
 
   <section id="view-status" hidden>
     <div class="status-card">
-      <div class="status-icon" id="statusIcon">🧾</div>
+      <div class="status-icon" id="statusIcon"></div>
       <h1 id="statusTitle">Sent to the counter</h1>
       <p class="muted" id="statusSub"></p>
       <ul id="statusItems" class="plain"></ul>

@@ -22,7 +22,7 @@ from pydantic import BaseModel  # noqa: E402
 from sqlalchemy import delete, func, select  # noqa: E402
 
 from . import ai, recommend  # noqa: E402
-from .db import Event, MenuItem, Order, SessionLocal, Visit, get_setting, init_db, set_setting, utcnow  # noqa: E402
+from .db import Admin, Event, MenuItem, Order, SessionLocal, Visit, get_setting, init_db, set_setting, utcnow  # noqa: E402
 from .seed import demo_items  # noqa: E402
 
 log = logging.getLogger("cafe")
@@ -184,6 +184,15 @@ def table_page(table_no: int, request: Request, db=Depends(get_db)):
     resp = templates.TemplateResponse(request, "table.html", {"cafe": cafe_name(db), "table": table_no})
     resp.set_cookie("visit", visit.id, max_age=6 * 3600, httponly=True, samesite="lax")
     return resp
+
+
+@app.get("/qr/site.svg")
+def qr_site(request: Request):
+    """QR for the app's own home page (shown on the /admin page)."""
+    base = os.getenv("PUBLIC_URL") or str(request.base_url).rstrip("/")
+    buf = io.BytesIO()
+    segno.make(base, error="h").save(buf, kind="svg", scale=8, border=2, dark="#2b1d14")
+    return Response(buf.getvalue(), media_type="image/svg+xml")
 
 
 @app.get("/qr/{table_no}.svg")
@@ -361,32 +370,101 @@ def order_status(order_id: int, request: Request, db=Depends(get_db)):
 
 # ---------- owner / staff ----------
 
-def admin_token():
-    return hmac.new(SECRET.encode(), f"admin:{ADMIN_PIN}".encode(), hashlib.sha256).hexdigest()
+# Accounts: email + scrypt-hashed password. Registering needs the staff invite code (ADMIN_PIN),
+# so a stranger who finds /admin on the public site can't create an account.
+
+def hash_password(password: str) -> str:
+    salt = os.urandom(16)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1)
+    return f"scrypt${salt.hex()}${digest.hex()}"
 
 
-def is_admin(request: Request):
-    return hmac.compare_digest(request.cookies.get("admin", ""), admin_token())
+def check_password(password: str, stored: str) -> bool:
+    try:
+        _, salt, digest = stored.split("$")
+        test = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=2**14, r=8, p=1)
+        return hmac.compare_digest(test.hex(), digest)
+    except ValueError:
+        return False
 
 
-def require_admin(request: Request):
-    if not is_admin(request):
+def admin_token(admin: Admin) -> str:
+    # Tied to the password hash, so changing a password logs out old sessions.
+    sig = hmac.new(SECRET.encode(), f"admin:{admin.id}:{admin.password_hash}".encode(), hashlib.sha256).hexdigest()
+    return f"{admin.id}.{sig}"
+
+
+def current_admin(request: Request, db) -> Admin | None:
+    admin_id, _, _ = request.cookies.get("admin", "").partition(".")
+    admin = db.get(Admin, int(admin_id)) if admin_id.isdigit() else None
+    if admin and hmac.compare_digest(request.cookies.get("admin", ""), admin_token(admin)):
+        return admin
+    return None
+
+
+def require_admin(request: Request, db=Depends(get_db)):
+    if not current_admin(request, db):
         raise HTTPException(401, "Owner login required")
 
 
+def auth_page(request, db, mode="login", error="", email="", name="", status=200):
+    return templates.TemplateResponse(
+        request, "login.html",
+        {"cafe": cafe_name(db), "mode": mode, "error": error, "email": email, "name": name},
+        status_code=status,
+    )
+
+
+def logged_in(admin: Admin):
+    resp = RedirectResponse("/admin", status_code=303)
+    resp.set_cookie("admin", admin_token(admin), max_age=12 * 3600, httponly=True, samesite="lax",
+                    secure=os.getenv("K_SERVICE") is not None)  # K_SERVICE is set on Cloud Run (https)
+    return resp
+
+
 @app.get("/admin", response_class=HTMLResponse)
-def admin_page(request: Request, db=Depends(get_db)):
-    if not is_admin(request):
-        return templates.TemplateResponse(request, "login.html", {"cafe": cafe_name(db), "error": False})
-    return templates.TemplateResponse(request, "admin.html", {"cafe": cafe_name(db)})
+def admin_page(request: Request, mode: str = "login", db=Depends(get_db)):
+    admin = current_admin(request, db)
+    if not admin:
+        return auth_page(request, db, mode="register" if mode == "register" else "login")
+    return templates.TemplateResponse(request, "admin.html", {"cafe": cafe_name(db), "admin_name": admin.name})
 
 
 @app.post("/admin/login")
-def admin_login(request: Request, pin: str = Form(...), db=Depends(get_db)):
-    if not hmac.compare_digest(pin, ADMIN_PIN):
-        return templates.TemplateResponse(request, "login.html", {"cafe": cafe_name(db), "error": True}, status_code=401)
+def admin_login(request: Request, email: str = Form(...), password: str = Form(...), db=Depends(get_db)):
+    email = email.strip().lower()
+    admin = db.scalar(select(Admin).where(Admin.email == email))
+    if not admin or not check_password(password, admin.password_hash):
+        return auth_page(request, db, error="That email and password don't match.", email=email, status=401)
+    return logged_in(admin)
+
+
+@app.post("/admin/register")
+def admin_register(request: Request, name: str = Form(...), email: str = Form(...), password: str = Form(...),
+                   invite: str = Form(...), db=Depends(get_db)):
+    name, email = name.strip()[:80], email.strip().lower()[:160]
+
+    def fail(msg):
+        return auth_page(request, db, mode="register", error=msg, email=email, name=name, status=400)
+
+    if not hmac.compare_digest(invite.strip(), ADMIN_PIN):
+        return fail("That staff invite code isn't right. Ask the café owner for it.")
+    if not name or "@" not in email or "." not in email.split("@")[-1]:
+        return fail("Please enter your name and a valid email.")
+    if len(password) < 8:
+        return fail("Use a password with at least 8 characters.")
+    if db.scalar(select(Admin).where(Admin.email == email)):
+        return fail("An account with that email already exists. Log in instead.")
+    admin = Admin(name=name, email=email, password_hash=hash_password(password))
+    db.add(admin)
+    db.commit()
+    return logged_in(admin)
+
+
+@app.post("/admin/logout")
+def admin_logout():
     resp = RedirectResponse("/admin", status_code=303)
-    resp.set_cookie("admin", admin_token(), max_age=12 * 3600, httponly=True, samesite="lax")
+    resp.delete_cookie("admin")
     return resp
 
 

@@ -5,7 +5,8 @@
 <header class="topbar">
   <div>
     <div class="brand" id="cafeName">{{ cafe }}</div>
-    <div class="sub">Owner dashboard <span class="live-dot" title="Updating live"></span></div>
+    <div class="sub">Owner dashboard <span class="live-dot" title="Updating live"></span>
+      · {{ admin_name }} · <form method="post" action="/admin/logout" class="logout"><button class="link" type="submit">Log out</button></form></div>
   </div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="live" aria-selected="true">Live</button>
@@ -25,7 +26,7 @@
 
     <div class="grid2">
       <div class="panel">
-        <div class="panel-head"><h2>✨ What should I change?</h2>
+        <div class="panel-head"><h2 id="insightHead">What should I change?</h2>
           <button class="btn primary" id="askGemini">Ask Gemini</button></div>
         <p class="muted" id="insightHint">Gemini reads today's anonymous taps and suggests menu changes.</p>
         <div id="insights"></div>
@@ -42,7 +43,7 @@
       <div class="panel-head"><h2>How each item is landing (24h)</h2></div>
       <div class="table-wrap">
         <table class="stats">
-          <thead><tr><th>Item</th><th title="Times suggested">Shown</th><th>❤️</th><th>😐</th><th>✕</th><th>Ordered</th><th>Love rate</th></tr></thead>
+          <thead><tr><th>Item</th><th title="Times suggested">Shown</th><th id="thLove" title="Loved"></th><th id="thMeh" title="Okay"></th><th id="thNope" title="Passed"></th><th>Ordered</th><th>Love rate</th></tr></thead>
           <tbody id="statRows"></tbody>
         </table>
       </div>
@@ -51,7 +52,7 @@
 
   <section id="tab-menu" hidden>
     <div class="panel onboarding">
-      <h2>📸 Photograph your menu</h2>
+      <h2 id="photoHead">Photograph your menu</h2>
       <p class="muted">Snap your paper menu. Gemini turns it into a live, personalised QR menu. You review it before anything goes live.</p>
       <div class="upload-row">
         <input id="newCafeName" type="text" placeholder="Café name (optional)">
@@ -59,7 +60,7 @@
         <button class="btn primary" id="extractBtn" disabled>Read menu with Gemini</button>
       </div>
       <div id="draftWrap" hidden>
-        <p class="warn">⚠️ Gemini guessed the allergens. Check each item before publishing.</p>
+        <p class="warn" id="draftWarn">Gemini guessed the allergens. Check each item before publishing.</p>
         <div class="table-wrap">
           <table class="draft">
             <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Veg</th><th>Allergens</th><th>Blurb</th><th></th></tr></thead>

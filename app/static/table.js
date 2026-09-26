@@ -2,7 +2,8 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const CUR = document.body.dataset.currency || "₹";
-const MOOD_LABEL = { work: "💻 Working", meet: "🗣️ Meeting", unwind: "🛋️ Unwinding" };
+const MOOD_ICON = { work: Icon.work, meet: Icon.meet, unwind: Icon.unwind };
+const MOOD_LABEL = { work: "Working", meet: "Meeting", unwind: "Unwinding" };
 
 let S = { picks: [], mood: null };
 let menuMode = "full";
@@ -48,24 +49,24 @@ function cardHTML(it) {
   const inCart = cart.has(it.id);
   return `
   <article class="card ${it.reaction || ""}" data-id="${it.id}">
-    <div class="card-top"><span class="reason">✨ ${esc(it.reason)}</span><span class="price">${money(it.price)}</span></div>
+    <div class="card-top"><span class="reason">${Icon.spark("icon-sm")}${esc(it.reason)}</span><span class="price">${money(it.price)}</span></div>
     <h3><span class="dot ${it.veg ? "" : "nonveg"}" title="${it.veg ? "Vegetarian" : "Non-vegetarian"}"></span>${esc(it.name)}</h3>
     <p class="blurb">${esc(it.blurb || it.description)}</p>
     ${it.allergens.length ? `<p class="allergens">Contains: ${esc(it.allergens.join(", "))}</p>` : ""}
     <div class="card-actions">
       <div class="react" role="group" aria-label="Your reaction">
-        <button data-r="like" aria-label="Love it" aria-pressed="${it.reaction === "like"}">❤️</button>
-        <button data-r="meh" aria-label="It's okay" aria-pressed="${it.reaction === "meh"}">😐</button>
-        <button data-r="nope" aria-label="Not for me" aria-pressed="false">✕</button>
+        <button data-r="like" aria-label="Love it" aria-pressed="${it.reaction === "like"}">${Icon.heart()}</button>
+        <button data-r="meh" aria-label="It's okay" aria-pressed="${it.reaction === "meh"}">${Icon.meh()}</button>
+        <button data-r="nope" aria-label="Not for me" aria-pressed="false">${Icon.nope()}</button>
       </div>
-      <button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? "✓ Added" : "+ Add"}</button>
+      <button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? Icon.check("icon-sm") + " Added" : Icon.plus("icon-sm") + " Add"}</button>
     </div>
   </article>`;
 }
 
 function renderPicks() {
   $("#picks").innerHTML = S.picks.map(cardHTML).join("");
-  $("#changeMood").textContent = `${MOOD_LABEL[S.mood] || ""} · change`;
+  $("#changeMood").innerHTML = `${MOOD_LABEL[S.mood] || ""} · change`;
 }
 
 function setTheme(mood) {
@@ -132,7 +133,7 @@ function rowHTML(it, top) {
   <div class="row ${it.available ? "" : "off"}">
     <div><b><span class="dot ${it.veg ? "" : "nonveg"}"></span>${esc(it.name)}</b>${top ? '<span class="badge">Top match</span>' : ""}${it.available ? "" : '<span class="badge soldout">Sold out</span>'}</div>
     <div class="right"><span class="price">${money(it.price)}</span>
-      ${it.available ? `<button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? "✓" : "+ Add"}</button>` : ""}</div>
+      ${it.available ? `<button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? Icon.check("icon-sm") : Icon.plus("icon-sm") + " Add"}</button>` : ""}</div>
     <p class="blurb">${esc(it.blurb || it.description)}${it.allergens.length ? ` · <small>${esc(it.allergens.join(", "))}</small>` : ""}</p>
   </div>`;
 }
@@ -190,7 +191,7 @@ function cartTotal() {
 function renderCart() {
   const n = [...cart.values()].reduce((a, c) => a + c.qty, 0);
   $("#cartbar").hidden = n === 0 || !$("#view-status").hidden;
-  $("#cartCount").textContent = `🛒 ${n} item${n === 1 ? "" : "s"} · Review order`;
+  $("#cartCount").innerHTML = `${Icon.cart("icon-sm")} ${n} item${n === 1 ? "" : "s"} · Review order`;
   $("#cartTotal").textContent = money(cartTotal());
   $("#sheetTotal").textContent = money(cartTotal());
   $("#cartLines").innerHTML = [...cart.values()].map(({ item, qty }) => `
@@ -231,7 +232,7 @@ function showOrder(o) {
   show("status");
   renderCart();
   const ready = o.status !== "new";
-  $("#statusIcon").textContent = ready ? "☕" : "🧾";
+  $("#statusIcon").innerHTML = ready ? Icon.unwind() : Icon.clock();
   $("#statusTitle").textContent = ready ? "Your order is ready!" : "Sent to the counter";
   $("#statusSub").textContent = ready
     ? "Pick it up at the counter, or it's on its way to your table."
@@ -254,16 +255,21 @@ document.addEventListener("pointerdown", (e) => {
   window.Ambience.unlock();
   if (!soundHinted) {
     soundHinted = true;
-    if ($("#soundBtn").textContent === "🔊") toast(`♪ ${window.Ambience.name} · tap 🔊 to mute`);
+    if ($("#soundBtn").dataset.on === "true") toast(`${window.Ambience.name} · tap the speaker to mute`);
   }
 }, { capture: true });
 $("#soundBtn").addEventListener("click", () => {
   soundHinted = true;
   const on = window.Ambience?.toggle();
-  toast(on ? `♪ ${window.Ambience.name}` : "Music off");
+  toast(on ? window.Ambience.name : "Music off");
 });
 
 // ---------- boot ----------
+$$(".mood").forEach((b) => { $(".mood-icon", b).innerHTML = (MOOD_ICON[b.dataset.mood] || Icon.work)(); });
+const SET_ICON = { love: Icon.heart, mixed: Icon.meh, nope: Icon.nope };
+$$("[data-set]").forEach((b) => { $(".set-icon", b).innerHTML = (SET_ICON[b.dataset.set] || Icon.meh)(); });
+$("#backToPicks").innerHTML = `${Icon.arrowLeft("icon-sm")} My picks`;
+
 (async () => {
   try {
     const data = await api("/api/visit");

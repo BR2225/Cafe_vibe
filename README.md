@@ -31,7 +31,7 @@ cp .env.example .env        # add your GEMINI_API_KEY
 uvicorn app.main:app --reload --port 8080
 ```
 - Customer page: http://localhost:8080/t/1
-- Owner dashboard: http://localhost:8080/admin (PIN from `ADMIN_PIN`, default `1234`)
+- Owner dashboard: http://localhost:8080/admin. **Register** an account there; registering needs the staff invite code (`ADMIN_PIN`, default `1234`).
 
 Locally it uses SQLite (`cafe.db`). On Cloud Run it uses Cloud SQL.
 
@@ -47,7 +47,7 @@ Locally it uses SQLite (`cafe.db`). On Cloud Run it uses Cloud SQL.
 4. Copy the **Connection name** (`PROJECT:asia-south1:INSTANCE`).
 
 ### 2. Secrets (Secret Manager)
-Create `GEMINI_API_KEY`, `DB_PASS`, `ADMIN_PIN` and `SECRET_KEY` (any long random string).
+Create `GEMINI_API_KEY`, `DB_PASS`, `ADMIN_PIN` (the staff invite code needed to register owner accounts) and `SECRET_KEY` (any long random string).
 
 ### 3. Cloud Run service
 1. Go to Cloud Run → **Deploy container** → **Service** → **Continuously deploy from a repository**.

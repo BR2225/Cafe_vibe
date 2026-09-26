@@ -74,6 +74,16 @@ class Setting(Base):
     value: Mapped[str] = mapped_column(Text)
 
 
+class Admin(Base):
+    """Café owner / staff account for the dashboard."""
+    __tablename__ = "admins"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    email: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class MenuItem(Base):
     __tablename__ = "menu_items"
     __table_args__ = {"sqlite_autoincrement": True}  # never reuse ids, so old taps can't attach to new items
