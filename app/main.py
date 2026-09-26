@@ -22,7 +22,7 @@ from fastapi.templating import Jinja2Templates  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 from sqlalchemy import delete, func, select  # noqa: E402
 
-from . import ai, recommend  # noqa: E402
+from . import ai, options, recommend  # noqa: E402
 from .db import Admin, CafeTable, Event, MenuItem, Order, SessionLocal, Visit, get_setting, init_db, set_setting, utcnow  # noqa: E402
 from .seed import demo_items  # noqa: E402
 
@@ -54,6 +54,20 @@ def remove_items(db, items):
         db.flush()
 
 
+def clean_option_groups(groups) -> list[dict] | None:
+    """Keep only well-formed option groups (from Gemini's menu reading)."""
+    out = []
+    for g in groups[:8]:
+        choices = [
+            {"label": str(c.get("label", "")).strip()[:40], "price": float(c.get("price") or 0)}
+            for c in (g.get("choices") or [])[:10] if str(c.get("label", "")).strip()
+        ]
+        if g.get("name") and len(choices) >= 1:
+            out.append({"name": str(g["name"]).strip()[:30], "type": "multi" if g.get("type") == "multi" else "single",
+                        "choices": choices})
+    return out or None
+
+
 def add_items(db, drafts):
     for d in drafts:
         db.add(MenuItem(
@@ -65,6 +79,7 @@ def add_items(db, drafts):
             allergens=[a.strip().lower() for a in d.get("allergens") or [] if a.strip()],
             tags=[t.strip().lower() for t in d.get("tags") or [] if t.strip()],
             blurb=(d.get("blurb") or "").strip(),
+            options=clean_option_groups(d.get("options") or []),
         ))
     db.commit()
     ensure_embeddings(db)
@@ -132,6 +147,7 @@ def card(item, visit, menu, popular, score=None):
         "id": item.id, "name": item.name, "price": item.price, "category": item.category,
         "description": item.description, "blurb": item.blurb, "veg": item.veg,
         "allergens": item.allergens or [], "tags": item.tags or [], "available": item.available,
+        "options": options.options_for(item),
         "reason": recommend.reason(item, visit, menu, popular),
         "reaction": (visit.reactions or {}).get(str(item.id)),
         "score": score,
@@ -244,6 +260,7 @@ class SetIn(BaseModel):
 class OrderLine(BaseModel):
     id: int
     qty: int = 1
+    choices: dict[str, list[str]] = {}
 
 
 class OrderIn(BaseModel):
@@ -370,10 +387,15 @@ def place_order(body: OrderIn, request: Request, db=Depends(get_db)):
     if not table or not table.active:
         raise HTTPException(409, "This table isn't taking orders right now. Please order at the counter.")
     by_id = {i.id: i for i in all_items(db)}
-    lines = [
-        {"id": l.id, "name": by_id[l.id].name, "qty": max(1, min(l.qty, 20)), "price": by_id[l.id].price}
-        for l in body.items if l.id in by_id and by_id[l.id].available
-    ]
+    lines = []
+    for l in body.items[:30]:
+        item = by_id.get(l.id)
+        if not item or not item.available:
+            continue
+        # Prices are always recomputed here from the menu, never trusted from the phone.
+        unit, summary, clean = options.price_line(item, l.choices)
+        lines.append({"id": item.id, "name": item.name, "qty": max(1, min(l.qty, 20)), "price": unit,
+                      "base_price": item.price, "custom": summary, "choices": clean})
     if not lines:
         raise HTTPException(400, "Your cart is empty")
     order = Order(visit_id=visit.id, table_no=visit.table_no, items=lines, note=body.note.strip()[:300])
@@ -626,8 +648,14 @@ def collect_stats(db, hours=24):
         return best if best and best[key] >= min_n else None
 
     liked_not_ordered = [r["name"] for r in rows if r["like"] >= 2 and r["ordered"] == 0]
+    custom = Counter()
+    for (lines,) in db.execute(select(Order.items).where(Order.created_at >= since)):
+        for line in lines or []:
+            for label in line.get("custom") or []:
+                custom[label] += line.get("qty", 1)
     return {
         "items": rows, "moods": moods, "set_buttons": sets, "active_tables": active or 0,
+        "customisations": [{"label": k, "count": v} for k, v in custom.most_common(8)],
         "taps": sum(r["like"] + r["meh"] + r["nope"] for r in rows) + sum(sets.values()),
         "highlights": {
             "top_loved": top("like"), "most_rejected": top("nope"), "most_ordered": top("ordered"),
@@ -658,6 +686,7 @@ def admin_insights(db=Depends(get_db)):
         "items": [{k: r[k] for k in ("name", "category", "price", "shown", "like", "meh", "nope", "ordered")}
                   for r in stats["items"] if r["shown"] or r["like"] or r["nope"] or r["ordered"]],
         "moods_chosen": stats["moods"], "set_buttons": stats["set_buttons"],
+        "popular_customisations": stats["customisations"],
     }
     try:
         return {"insights": ai.owner_insights(cafe_name(db), compact)}
@@ -713,6 +742,7 @@ class DraftIn(BaseModel):
     allergens: list[str] = []
     tags: list[str] = []
     blurb: str = ""
+    options: list[dict] = []
 
 
 class SaveMenuIn(BaseModel):

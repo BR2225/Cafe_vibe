@@ -2,7 +2,7 @@
 import os
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, create_engine, inspect, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -115,6 +115,7 @@ class MenuItem(Base):
     blurb: Mapped[str] = mapped_column(Text, default="")
     available: Mapped[bool] = mapped_column(Boolean, default=True)
     embedding: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    options: Mapped[list | None] = mapped_column(JSON, nullable=True)  # menu-specific option groups
 
 
 class Visit(Base):
@@ -156,6 +157,25 @@ class Order(Base):
 
 def init_db():
     Base.metadata.create_all(engine)
+    add_missing_columns()
+
+
+def add_missing_columns():
+    """Tiny migration: add columns that exist in the models but not yet in the database.
+
+    create_all() only creates missing tables, so new (nullable) columns on existing tables
+    such as menu_items.options are added here, on both SQLite and Cloud SQL.
+    """
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            have = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in have and col.nullable:
+                    ddl = col.type.compile(dialect=engine.dialect)
+                    conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl}'))
 
 
 def get_setting(db, key, default=""):

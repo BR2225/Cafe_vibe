@@ -50,6 +50,10 @@ async function refresh() {
     <div class="hl bad"><small>Most rejected</small><b>${h.most_rejected ? `${esc(h.most_rejected.name)} · ${Icon.nope("icon-sm")} ${h.most_rejected.nope}` : "Nothing rejected yet"}</b></div>
     <div class="hl"><small>Loved but not ordered</small><b>${h.liked_not_ordered.length ? esc(h.liked_not_ordered.join(", ")) : "–"}</b></div>`;
 
+  $("#customs").innerHTML = s.customisations.length
+    ? s.customisations.map((c) => `<span class="chip">${esc(c.label)} <b>×${c.count}</b></span>`).join("")
+    : '<span class="muted">No customised orders yet today.</span>';
+
   const active = s.items.filter((r) => r.shown || r.like || r.meh || r.nope || r.ordered);
   $("#statRows").innerHTML = active.length
     ? active.map((r) => `<tr>
@@ -64,7 +68,7 @@ async function refresh() {
   $("#orders").innerHTML = open.length
     ? open.map((o) => `<div class="order ${o.status}">
         <div class="order-head"><span>${esc(o.table_label || "Table " + o.table)}</span><span class="muted">#${o.id} · ${o.age_min}m</span></div>
-        <div>${o.items.map((l) => `${l.qty}× ${esc(l.name)}`).join(", ")}</div>
+        <ul class="order-lines">${o.items.map((l) => `<li><b>${l.qty}×</b> ${esc(l.name)}${(l.custom || []).length ? `<small class="custom">${esc(l.custom.join(" · "))}</small>` : ""}</li>`).join("")}</ul>
         ${o.note ? `<div class="muted">“${esc(o.note)}”</div>` : ""}
         <div class="row-actions">
           ${o.status === "new" ? `<button class="btn primary" data-order="${o.id}" data-status="ready">Mark ready</button>` : ""}

@@ -80,5 +80,17 @@
     <p class="privacy">Pay at the counter as usual.</p>
   </div>
 </dialog>
+
+<dialog id="customSheet" class="sheet" aria-labelledby="cusName">
+  <div class="sheet-inner">
+    <div class="section-head"><h2 id="cusName"></h2><button class="link" id="closeCustom">Close</button></div>
+    <p class="usual-note" id="cusUsual" hidden>Pre-set to your usual. Change anything you like.</p>
+    <div id="cusGroups" class="optgroups"></div>
+    <div class="cus-foot">
+      <span class="qty" aria-label="Quantity"><button id="cusMinus" aria-label="One less">−</button><b id="cusQty">1</b><button id="cusPlus" aria-label="One more">+</button></span>
+      <button class="btn primary" id="cusAdd"></button>
+    </div>
+  </div>
+</dialog>
 {% endblock %}
 {% block scripts %}<script src="/static/ambience.js" defer></script><script src="/static/table.js" defer></script>{% endblock %}

@@ -7,7 +7,7 @@ const MOOD_LABEL = { work: "Working", meet: "Meeting", unwind: "Unwinding" };
 
 let S = { picks: [], mood: null };
 let menuMode = "full";
-const cart = new Map(); // id -> {item, qty}
+const cart = new Map(); // key (item + choices) -> {item, qty, choices, unit, summary}
 let orderPoll = null;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -46,7 +46,7 @@ function show(view) {
 // ---------- picks ----------
 
 function cardHTML(it) {
-  const inCart = cart.has(it.id);
+  const inCart = countInCart(it.id);
   return `
   <article class="card ${it.reaction || ""}" data-id="${it.id}">
     <div class="card-top"><span class="reason">${Icon.spark("icon-sm")}${esc(it.reason)}</span><span class="price">${money(it.price)}</span></div>
@@ -59,7 +59,7 @@ function cardHTML(it) {
         <button data-r="meh" aria-label="It's okay" aria-pressed="${it.reaction === "meh"}">${Icon.meh()}</button>
         <button data-r="nope" aria-label="Not for me" aria-pressed="false">${Icon.nope()}</button>
       </div>
-      <button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? Icon.check("icon-sm") + " Added" : Icon.plus("icon-sm") + " Add"}</button>
+      <button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? `${Icon.check("icon-sm")} ${inCart} · Add` : Icon.plus("icon-sm") + " Add"}</button>
     </div>
   </article>`;
 }
@@ -103,9 +103,7 @@ $("#picks").addEventListener("click", (e) => {
       if (reaction === "nope") toast("Swapped it for something else");
     });
   } else if (add) {
-    const it = S.picks.find((p) => p.id === Number(add.dataset.add));
-    toggleCart(it);
-    renderPicks();
+    startAdd(S.picks.find((p) => p.id === Number(add.dataset.add)));
   }
 });
 
@@ -128,12 +126,12 @@ $$("[data-set]").forEach((b) =>
 // ---------- full menu ----------
 
 function rowHTML(it, top) {
-  const inCart = cart.has(it.id);
+  const inCart = countInCart(it.id);
   return `
   <div class="row ${it.available ? "" : "off"}">
     <div><b><span class="dot ${it.veg ? "" : "nonveg"}"></span>${esc(it.name)}</b>${top ? '<span class="badge">Top match</span>' : ""}${it.available ? "" : '<span class="badge soldout">Sold out</span>'}</div>
     <div class="right"><span class="price">${money(it.price)}</span>
-      ${it.available ? `<button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? Icon.check("icon-sm") : Icon.plus("icon-sm") + " Add"}</button>` : ""}</div>
+      ${it.available ? `<button class="add ${inCart ? "in-cart" : ""}" data-add="${it.id}">${inCart ? `${Icon.check("icon-sm")} ${inCart}` : Icon.plus("icon-sm") + " Add"}</button>` : ""}</div>
     <p class="blurb">${esc(it.blurb || it.description)}${it.allergens.length ? ` · <small>${esc(it.allergens.join(", "))}</small>` : ""}</p>
   </div>`;
 }
@@ -169,22 +167,128 @@ $("#backToPicks").addEventListener("click", () => show(S.picks.length ? "picks" 
 $("#menuList").addEventListener("click", (e) => {
   const add = e.target.closest("[data-add]");
   if (!add) return;
-  toggleCart(menuItems.find((m) => m.id === Number(add.dataset.add)));
-  renderMenu();
+  startAdd(menuItems.find((m) => m.id === Number(add.dataset.add)));
+});
+
+// ---------- customisation ----------
+// The phone remembers your usual choices (e.g. oat milk, less sugar) and pre-selects them.
+const USUAL_KEY = "cafe-usual";
+function loadUsual() { try { return JSON.parse(localStorage.getItem(USUAL_KEY)) || {}; } catch { return {}; } }
+function saveUsual(choices) {
+  try { localStorage.setItem(USUAL_KEY, JSON.stringify({ ...loadUsual(), ...choices })); } catch { /* storage blocked */ }
+}
+
+let cus = null; // {item, qty, choices}
+
+function defaultChoices(item, usual = {}) {
+  const choices = {};
+  let fromUsual = false;
+  for (const g of item.options || []) {
+    const labels = g.choices.map((c) => c.label);
+    const def = g.choices.find((c) => c.default)?.label || labels[0];
+    const remembered = (usual[g.name] || []).filter((l) => labels.includes(l));
+    if (g.type === "multi") {
+      choices[g.name] = []; // extras are never pre-added: no surprise charges
+    } else if (remembered.length) {
+      choices[g.name] = remembered.slice(0, 1);
+      if (remembered[0] !== def) fromUsual = true;
+    } else {
+      choices[g.name] = [def];
+    }
+  }
+  return { choices, fromUsual };
+}
+
+function unitPrice(item, choices) {
+  if (item.price == null) return null;
+  let p = item.price;
+  for (const g of item.options || []) {
+    for (const l of choices[g.name] || []) p += g.choices.find((c) => c.label === l)?.price || 0;
+  }
+  return p;
+}
+
+function summaryOf(item, choices) {
+  const out = [];
+  for (const g of item.options || []) {
+    const def = g.choices.find((c) => c.default)?.label;
+    for (const l of choices[g.name] || []) if (g.type === "multi" || l !== def) out.push(l);
+  }
+  return out;
+}
+
+function startAdd(item) {
+  if (!item) return;
+  if (!(item.options || []).length) return addToCart(item, {}, 1);
+  const { choices, fromUsual } = defaultChoices(item, loadUsual());
+  cus = { item, qty: 1, choices };
+  $("#cusName").textContent = item.name;
+  $("#cusUsual").hidden = !fromUsual;
+  renderCustom();
+  $("#customSheet").showModal();
+}
+
+function renderCustom() {
+  const { item, choices } = cus;
+  $("#cusGroups").innerHTML = item.options.map((g, gi) => `
+    <fieldset class="optgroup">
+      <legend>${esc(g.name)} <small>${g.type === "multi" ? "add any" : "pick one"}</small></legend>
+      <div class="opt-chips">${g.choices.map((c) => {
+        const on = (choices[g.name] || []).includes(c.label);
+        return `<label class="opt ${on ? "on" : ""}">
+          <input type="${g.type === "multi" ? "checkbox" : "radio"}" name="g${gi}" data-g="${esc(g.name)}" value="${esc(c.label)}" ${on ? "checked" : ""}>
+          <span>${esc(c.label)}${c.price ? ` <small>+${money(c.price)}</small>` : ""}</span></label>`;
+      }).join("")}</div>
+    </fieldset>`).join("");
+  $("#cusQty").textContent = cus.qty;
+  const unit = unitPrice(item, choices);
+  $("#cusAdd").textContent = `Add to order${unit != null ? " · " + money(unit * cus.qty) : ""}`;
+}
+
+$("#cusGroups").addEventListener("change", (e) => {
+  const input = e.target.closest("input[data-g]");
+  if (!input) return;
+  const g = input.dataset.g;
+  cus.choices[g] = input.type === "radio"
+    ? [input.value]
+    : $$(`input[data-g="${CSS.escape(g)}"]:checked`, $("#cusGroups")).map((i) => i.value);
+  renderCustom();
+});
+$("#cusMinus").addEventListener("click", () => { cus.qty = Math.max(1, cus.qty - 1); renderCustom(); });
+$("#cusPlus").addEventListener("click", () => { cus.qty = Math.min(20, cus.qty + 1); renderCustom(); });
+$("#closeCustom").addEventListener("click", () => $("#customSheet").close());
+$("#cusAdd").addEventListener("click", () => {
+  const singles = Object.fromEntries(
+    (cus.item.options || []).filter((g) => g.type !== "multi").map((g) => [g.name, cus.choices[g.name]])
+  );
+  saveUsual(singles);
+  addToCart(cus.item, cus.choices, cus.qty);
+  $("#customSheet").close();
 });
 
 // ---------- cart ----------
 
-function toggleCart(it) {
-  if (!it) return;
-  if (cart.has(it.id)) cart.delete(it.id);
-  else { cart.set(it.id, { item: it, qty: 1 }); toast(`${it.name} added`); }
+function countInCart(id) {
+  let n = 0;
+  cart.forEach((l) => { if (l.item.id === id) n += l.qty; });
+  return n;
+}
+
+function addToCart(item, choices, qty) {
+  const key = `${item.id}|${JSON.stringify(choices)}`;
+  const line = cart.get(key);
+  const summary = summaryOf(item, choices);
+  if (line) line.qty = Math.min(20, line.qty + qty);
+  else cart.set(key, { item, qty, choices, unit: unitPrice(item, choices), summary });
+  toast(`${item.name}${summary.length ? ` (${summary.join(", ")})` : ""} added`);
   renderCart();
+  if (!$("#view-picks").hidden) renderPicks();
+  if (!$("#view-menu").hidden) renderMenu();
 }
 
 function cartTotal() {
   let t = 0;
-  cart.forEach(({ item, qty }) => (t += (item.price || 0) * qty));
+  cart.forEach(({ unit, qty }) => (t += (unit || 0) * qty));
   return t;
 }
 
@@ -194,9 +298,9 @@ function renderCart() {
   $("#cartCount").innerHTML = `${Icon.cart("icon-sm")} ${n} item${n === 1 ? "" : "s"} · Review order`;
   $("#cartTotal").textContent = money(cartTotal());
   $("#sheetTotal").textContent = money(cartTotal());
-  $("#cartLines").innerHTML = [...cart.values()].map(({ item, qty }) => `
-    <li><span>${esc(item.name)}<br><small class="muted">${money(item.price)}</small></span>
-      <span class="qty"><button data-q="-1" data-id="${item.id}" aria-label="One less">−</button><b>${qty}</b><button data-q="1" data-id="${item.id}" aria-label="One more">+</button></span></li>`).join("");
+  $("#cartLines").innerHTML = [...cart.entries()].map(([key, { item, qty, unit, summary }]) => `
+    <li><span>${esc(item.name)}${summary.length ? `<br><small class="custom">${esc(summary.join(" · "))}</small>` : ""}<br><small class="muted">${money(unit)}</small></span>
+      <span class="qty"><button data-q="-1" data-key="${esc(key)}" aria-label="One less">−</button><b>${qty}</b><button data-q="1" data-key="${esc(key)}" aria-label="One more">+</button></span></li>`).join("");
 }
 
 $("#openCart").addEventListener("click", () => $("#cartSheet").showModal());
@@ -204,9 +308,10 @@ $("#closeCart").addEventListener("click", () => $("#cartSheet").close());
 $("#cartLines").addEventListener("click", (e) => {
   const b = e.target.closest("[data-q]");
   if (!b) return;
-  const line = cart.get(Number(b.dataset.id));
-  line.qty += Number(b.dataset.q);
-  if (line.qty <= 0) cart.delete(line.item.id);
+  const line = cart.get(b.dataset.key);
+  if (!line) return;
+  line.qty = Math.min(20, line.qty + Number(b.dataset.q));
+  if (line.qty <= 0) cart.delete(b.dataset.key);
   renderCart();
   if (!cart.size) $("#cartSheet").close();
   if (!$("#view-picks").hidden) renderPicks();
@@ -215,7 +320,7 @@ $("#cartLines").addEventListener("click", (e) => {
 
 $("#sendOrder").addEventListener("click", () =>
   busy($("#sendOrder"), async () => {
-    const items = [...cart.values()].map(({ item, qty }) => ({ id: item.id, qty }));
+    const items = [...cart.values()].map(({ item, qty, choices }) => ({ id: item.id, qty, choices }));
     const order = await api("/api/order", { items, note: $("#note").value });
     cart.clear();
     $("#note").value = "";
@@ -237,7 +342,7 @@ function showOrder(o) {
   $("#statusSub").textContent = ready
     ? "Pick it up at the counter, or it's on its way to your table."
     : o.ahead ? `${o.ahead} order${o.ahead === 1 ? "" : "s"} ahead of you.` : "You're next in line.";
-  $("#statusItems").innerHTML = o.items.map((l) => `<li>${l.qty} × ${esc(l.name)}</li>`).join("");
+  $("#statusItems").innerHTML = o.items.map((l) => `<li>${l.qty} × ${esc(l.name)}${(l.custom || []).length ? ` <small class="custom">(${esc(l.custom.join(", "))})</small>` : ""}</li>`).join("");
   if (ready) clearInterval(orderPoll);
 }
 

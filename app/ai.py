@@ -71,6 +71,17 @@ def embed(texts: list[str], task: str = "RETRIEVAL_DOCUMENT") -> list[list[float
 
 # ---------- photo -> menu ----------
 
+class OptionChoice(BaseModel):
+    label: str
+    price: float
+
+
+class OptionGroup(BaseModel):
+    name: str
+    type: str
+    choices: list[OptionChoice]
+
+
 class DraftItem(BaseModel):
     name: str
     description: str
@@ -80,6 +91,7 @@ class DraftItem(BaseModel):
     allergens: list[str]
     tags: list[str]
     blurb: str
+    options: list[OptionGroup]
 
 
 EXTRACT_PROMPT = """You are digitising a café menu from a photo.
@@ -92,6 +104,12 @@ Extract EVERY orderable item you can read. For each item:
 - allergens: LIKELY allergens from this list only: dairy, gluten, nuts, egg, soy, sesame, fish, shellfish
 - tags: 3-6 short taste/mood words (e.g. strong, sweet, light, filling, refreshing, comforting, shareable, spicy, caffeine-free, indulgent)
 - blurb: an appetising 6-12 word line a barista would say about it
+- options: ONLY customisations actually printed on the menu for this item (or for its whole
+  section), e.g. sizes, milk alternatives, add-ons, extra shots. Each group has a name
+  ("Size", "Milk", "Add-ons"), type "single" (pick one) or "multi" (pick any), and choices
+  with price = EXTRA cost over the item's base price (0 if free). If sizes are printed as
+  full prices (e.g. Regular 180 / Large 220), use the smallest as the item price and
+  deltas for the rest (Regular 0, Large 40). Use [] when nothing is printed.
 Do not invent items that are not on the menu."""
 
 
@@ -124,6 +142,7 @@ Here is today's anonymous tap data (JSON):
 
 Give exactly 3 insights the owner can act on this week. Ground every claim in the numbers
 (quote them). Look for: items loved but rarely ordered (price/visibility?), items often rejected,
+popular paid customisations (e.g. oat milk, large size - a candidate for a new menu item or combo),
 what each mood (working / meeting / unwinding) gravitates to, and gaps in the menu.
 Keep headline under 10 words, detail under 30 words, action under 15 words."""
 
