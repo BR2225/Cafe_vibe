@@ -2,12 +2,16 @@
 {% block title %}Table {{ table }} · {{ cafe }}{% endblock %}
 {% block bodyclass %}customer{% endblock %}
 {% block body %}
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
 <header class="topbar">
   <div>
     <div class="brand">{{ cafe }}</div>
     <div class="sub">Table {{ table }}</div>
   </div>
-  <button class="link" id="menuLink" data-go="menu" hidden>Full menu</button>
+  <div class="topbar-actions">
+    <button class="link" id="menuLink" data-go="menu" hidden>Full menu</button>
+    <button class="icon-btn" id="soundBtn" aria-label="Play music">🔇</button>
+  </div>
 </header>
 
 <main>
@@ -77,4 +81,4 @@
   </div>
 </dialog>
 {% endblock %}
-{% block scripts %}<script src="/static/table.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/ambience.js" defer></script><script src="/static/table.js" defer></script>{% endblock %}

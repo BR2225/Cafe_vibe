@@ -68,14 +68,21 @@ function renderPicks() {
   $("#changeMood").textContent = `${MOOD_LABEL[S.mood] || ""} · change`;
 }
 
+function setTheme(mood) {
+  document.body.dataset.mood = mood || "home";
+  window.Ambience?.setMood(mood || "home");
+}
+
 function applyState(data) {
   S = { ...S, ...data };
+  setTheme(S.mood);
   renderPicks();
 }
 
 $$(".mood").forEach((b) =>
   b.addEventListener("click", () =>
     busy(b, async () => {
+      setTheme(b.dataset.mood); // instant colour + music change, before the server answers
       applyState(await api("/api/mood", { mood: b.dataset.mood }));
       show("picks");
     })
@@ -237,6 +244,23 @@ $("#orderMore").addEventListener("click", () => {
   clearInterval(orderPoll);
   renderCart();
   show(S.picks.length ? "picks" : "mood");
+});
+
+// ---------- music ----------
+// Browsers only allow sound after a tap, so music starts on the first interaction.
+let soundHinted = false;
+document.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("#soundBtn") || !window.Ambience) return;
+  window.Ambience.unlock();
+  if (!soundHinted) {
+    soundHinted = true;
+    if ($("#soundBtn").textContent === "🔊") toast(`♪ ${window.Ambience.name} · tap 🔊 to mute`);
+  }
+}, { capture: true });
+$("#soundBtn").addEventListener("click", () => {
+  soundHinted = true;
+  const on = window.Ambience?.toggle();
+  toast(on ? `♪ ${window.Ambience.name}` : "Music off");
 });
 
 // ---------- boot ----------

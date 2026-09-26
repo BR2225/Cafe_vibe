@@ -261,3 +261,49 @@ th { color: var(--muted); font-weight: 600; font-size: .8rem; }
   main.wide { padding: 0; max-width: none; }
   .qr-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ---------- mood backgrounds ---------- */
+body.customer, body.home {
+  --bg-base: #f7efe6; --b1: #f1d3b3; --b2: #ecc4a4; --b3: #f6e4c3;
+  background: var(--bg-base); transition: background-color 1.5s ease;
+}
+body[data-mood=work]   { --bg-base: #eef3f9; --b1: #b9d3f2; --b2: #c3e7e2; --b3: #d8d3f4; --accent: #2f6db0; --accent-soft: #dde9f7; }
+body[data-mood=meet]   { --bg-base: #fdf1ea; --b1: #ffc3a1; --b2: #ffdc8f; --b3: #f8b3c1; --accent: #cf5a26; --accent-soft: #fde2d3; }
+body[data-mood=unwind] { --bg-base: #f4eff8; --b1: #d3bff0; --b2: #f6c4d6; --b3: #b8c6ec; --accent: #7650b8; --accent-soft: #ebe2f7; }
+@media (prefers-color-scheme: dark) {
+  body.customer, body.home { --bg-base: #17110d; --b1: #4a2f1c; --b2: #3d2716; --b3: #57391f; }
+  body[data-mood=work]   { --bg-base: #0e1520; --b1: #1c3a5e; --b2: #15433f; --b3: #2b2958; --accent: #6fa8e8; --accent-soft: #1b2d44; }
+  body[data-mood=meet]   { --bg-base: #1c120d; --b1: #5e2d19; --b2: #5a451a; --b3: #55202f; --accent: #f08a55; --accent-soft: #3d2317; }
+  body[data-mood=unwind] { --bg-base: #15111d; --b1: #3c2a60; --b2: #54263f; --b3: #21305c; --accent: #b594ee; --accent-soft: #2e2442; }
+}
+.bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bg i {
+  position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%;
+  filter: blur(70px); opacity: .7; transition: background-color 1.5s ease;
+  animation: drift 26s ease-in-out infinite alternate;
+}
+.bg i:nth-child(1) { background: var(--b1); top: -25vmax; left: -20vmax; }
+.bg i:nth-child(2) { background: var(--b2); bottom: -30vmax; right: -25vmax; animation-duration: 32s; animation-delay: -8s; }
+.bg i:nth-child(3) { background: var(--b3); top: 30%; left: 35%; width: 45vmax; height: 45vmax; animation-duration: 38s; animation-delay: -15s; }
+@keyframes drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(6vmax, 4vmax) scale(1.08); }
+  100% { transform: translate(-4vmax, 7vmax) scale(.95); }
+}
+@media (prefers-reduced-motion: reduce) { .bg i { animation: none; } }
+
+/* Frosted surfaces so the mood colour shows through. */
+.customer .topbar { background: color-mix(in srgb, var(--bg-base) 70%, transparent); }
+.customer .card, .customer .mood, .customer .set, .customer .status-card {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+}
+.customer .card.like { background: color-mix(in srgb, var(--good-soft) 70%, transparent); border-color: var(--good); }
+.customer .seg { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+.customer .cartbar { background: linear-gradient(transparent, color-mix(in srgb, var(--bg-base) 90%, transparent) 40%); }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); font-size: 1.1rem;
+  background: color-mix(in srgb, var(--surface) 75%, transparent); display: grid; place-items: center;
+}
