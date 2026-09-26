@@ -458,7 +458,8 @@ def require_admin(request: Request, db=Depends(get_db)):
 def auth_page(request, db, mode="login", error="", email="", name="", status=200):
     return templates.TemplateResponse(
         request, "login.html",
-        {"cafe": cafe_name(db), "mode": mode, "error": error, "email": email, "name": name},
+        {"cafe": cafe_name(db), "mode": mode, "error": error, "email": email, "name": name,
+         "public_url": public_base(request)},
         status_code=status,
     )
 
